@@ -11,13 +11,13 @@
 ```
 assets/BGM/opening/opening.mp3 (60MB)
 assets/BGM/accusation/accusation.mp3 (5.9MB)
+assets/assets/大野克夫 - 「名探偵コナン」~メインテーマ.mp3 (5.9MB)
 assets/BGM/confession/confession.mp3 (5.3MB)
-assets/BGM/be/be.mp3 (4.2MB)
 assets/BGM/all_scenes/scene3.mp3 (4.8MB)
+assets/BGM/be/be.mp3 (4.2MB)
 assets/BGM/all_scenes/scene2.mp3 (4.0MB)
 assets/BGM/all_scenes/scene4.mp3 (3.3MB)
 assets/BGM/all_scenes/scene1.mp3 (2.2MB)
-assets/assets/大野克夫 - 「名探偵コナン」~メインテーマ.mp3 (5.9MB)
 ```
 
 ## 解决方案
