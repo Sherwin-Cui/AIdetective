@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雨夜山庄谜案</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23ffffff'/><circle cx='8' cy='8' r='6' fill='%230000ff'/><text x='8' y='12' font-family='Arial' font-size='10' text-anchor='middle' fill='%23ffffff'>D</text></svg>" />
+</head>
+<body>
+    <!-- 主菜单 -->
+    <div id="main-menu">
+        <h1>雨夜山庄谜案</h1>
+        <button id="start-game-btn">进入游戏</button>
+    </div>
+
+    <!-- 故事介绍 -->
+    <div id="story-intro">
+        <div id="intro-text"></div>
+        <button id="start-investigation-btn">开始调查</button>
+    </div>
+
+    <!-- 游戏容器 -->
+    <div id="game-container">
+        <!-- 顶部栏 -->
+        <div id="top-bar">
+            <div id="scene-name">别墅外景</div>
+            <div id="game-time">晚上 9:30</div>
+            <button id="main-menu-btn">≡</button>
+        </div>
+
+        <!-- 主菜单面板 -->
+        <div id="main-menu-panel">
+            <div id="main-menu-content">
+                <h2 id="main-menu-title">游戏菜单</h2>
+                <button class="menu-option" id="resume-game">🎮 返回游戏</button>
+                <button class="menu-option" id="restart-game">🔄 重新游玩</button>
+                <button class="menu-option" id="view-hints">💡 查看提示</button>
+                <!-- 开发者选项 -->
+                <div class="menu-separator"></div>
+                <h3 class="menu-subtitle">开发者工具</h3>
+                <button class="menu-option" id="prompt-test">📝 提示词测试</button>
+                <button class="menu-option" id="consistency-test">🔍 角色一致性测试</button>
+                <button class="menu-option" id="integration-report">📊 集成测试报告</button>
+                <button class="menu-option" id="ai-config">⚙️ AI配置说明</button>
+            </div>
+        </div>
+
+        <!-- 提示面板 -->
+        <div id="hint-panel">
+            <div id="hint-content">
+                <h2 id="hint-title">游戏提示</h2>
+                <div id="hint-text"></div>
+                <button id="hint-back-btn">返回菜单</button>
+            </div>
+        </div>
+
+        <!-- 场景显示区 -->
+        <div id="scene-display">
+            <div id="scene-switcher"></div>
+        </div>
+
+        <!-- 旧对话容器（保留兼容性） -->
+        <div id="dialogue-container">
+            <button id="dialogue-close-btn" class="close-btn">&times;</button>
+            <div id="dialogue-history"></div>
+            <div id="player-input-container">
+                <input type="text" id="player-input" placeholder="输入你的问题...">
+                <button id="send-btn">发送</button>
+            </div>
+        </div>
+
+        <!-- 线索面板（将被模态框替代） -->
+        <div id="clues-panel">
+            <div class="panel-header">
+                <h3>线索清单 (<span id="clues-stats">0/0</span>)</h3>
+                <div class="clue-categories">
+                    <button class="category-tab active" data-category="all">全部</button>
+                    <button class="category-tab" data-category="evidence">物证</button>
+                    <button class="category-tab" data-category="testimony">证词</button>
+                    <button class="category-tab" data-category="inference">推理</button>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div id="clues-grid" class="clues-grid"></div>
+            </div>
+            <div class="panel-footer">
+                <button id="close-clues-panel" class="close-btn">关闭</button>
+            </div>
+        </div>
+
+        <!-- 底部操作栏 -->
+        <div id="bottom-action-bar">
+            <!-- 左侧NPC区域 -->
+            <div id="npc-area"></div>
+            
+            <!-- 右侧功能按钮 -->
+            <div id="action-buttons">
+                <button id="investigate-btn" class="main-action-btn">
+                    <span>调查</span>
+                </button>
+                <button id="move-btn" class="main-action-btn">
+                    <span>移动</span>
+                </button>
+                <button id="clues-btn" class="main-action-btn">
+                    <span>📋 线索</span>
+                    <span id="clues-count">(0)</span>
+                    <span id="clue-notification-dot" class="notification-dot hidden"></span>
+                </button>
+                <button id="inference-btn" class="main-action-btn">
+                    <span>🧠 推理</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框：对话选择 -->
+    <div id="dialogue-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn">&times;</button>
+            <h2 class="modal-title">选择对话角色</h2>
+            <ul id="npc-list" class="selection-list"></ul>
+        </div>
+    </div>
+
+    <!-- 模态框：新对话窗口 -->
+    <div id="dialogue-modal-new" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn">&times;</button>
+            <h2 class="modal-title">对话 - <span id="current-npc-name"></span> <span id="dialogue-count-new"></span></h2>
+            
+            <!-- 头像区域 -->
+            <div class="dialogue-avatars">
+                <img id="dialogue-npc-avatar" class="dialogue-avatar" src="">
+                <img id="dialogue-detective-avatar" class="dialogue-avatar" src="assets/characters/me/detective.png">
+            </div>
+            
+            <!-- 对话区域 -->
+            <div id="dialogue-history-new" class="dialogue-history"></div>
+            
+            <!-- 输入区域 -->
+            <div class="dialogue-input-area">
+                <input type="text" id="dialogue-input-new" placeholder="输入问题...">
+                <button id="dialogue-send-new">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框：调查 -->
+    <div id="investigation-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn">&times;</button>
+            <h2 class="modal-title">选择调查地点</h2>
+            <ul id="investigation-list" class="selection-list"></ul>
+        </div>
+    </div>
+
+    <!-- 模态框：场景选择 -->
+    <div id="scene-selection-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn">&times;</button>
+            <h2 class="modal-title">选择移动场景</h2>
+            <div id="scene-list-container"></div>
+        </div>
+    </div>
+
+    <!-- 模态框：结果显示 -->
+    <div id="result-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn">&times;</button>
+            <h2 id="result-modal-title" class="modal-title"></h2>
+            <div id="result-modal-body">
+                <img id="result-modal-avatar" class="modal-avatar" src="" alt="NPC头像" style="display: none;">
+                <p id="result-modal-content" style="white-space: pre-wrap; line-height: 1.6;"></p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 模态框：线索 -->
+    <div id="clues-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-btn">&times;</button>
+            <h2 class="modal-title">线索清单 (<span id="clues-stats-modal">0/0</span>)</h2>
+            
+            <div class="clue-categories" style="text-align: center; margin-bottom: 20px;">
+                <button class="category-btn active" data-category="all">全部</button>
+                <button class="category-btn" data-category="evidence">物证</button>
+                <button class="category-btn" data-category="testimony">证词</button>
+                <button class="category-btn" data-category="inference">推理</button>
+            </div>
+            
+            <div style="max-height: 60vh; overflow-y: auto; padding: 0 10px;">
+                <div id="clues-grid-modal" class="clues-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 单个对话框交替显示的HTML结构示例 -->
+    <div id="accusation-dialogue-container" class="accusation-dialogue-container">
+      <div id="dialogue-box" class="dialogue-box">
+        <div id="avatar-container">
+          <img id="avatar-image" src="assets/characters/me/detective.png" alt="头像" />
+        </div>
+        <div id="dialogue-text" class="dialogue-text"></div>
+      </div>
+    </div>
+
+    <div id="evidence-selection" class="evidence-selection">
+      <div class="evidence-grid">
+        <!-- 证据项由JS动态生成 -->
+      </div>
+    </div>
+
+    <div id="pressure-display" class="pressure-display">
+      <span>压力值: <span id="pressure-value">0</span></span>
+    </div>
+
+    <!-- 确认对话框 -->
+    <div id="confirm-dialog">
+        <div id="confirm-dialog-content">
+            <h2 id="confirm-dialog-title">确认操作</h2>
+            <p id="confirm-dialog-message"></p>
+            <div id="confirm-dialog-buttons">
+                <button id="confirm-dialog-cancel" class="confirm-dialog-btn">取消</button>
+                <button id="confirm-dialog-ok" class="confirm-dialog-btn">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载主入口文件 -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

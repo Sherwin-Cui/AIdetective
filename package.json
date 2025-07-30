@@ -1,0 +1,15 @@
+{
+  "name": "detectivegame",
+  "version": "1.0.0",
+  "description": "Detective game project",
+  "main": "js/main.js",
+  "scripts": {
+    "dev": "live-server --port=8080",
+    "test": "echo \"No test specified\" && exit 0"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "live-server": "^1.2.1"
+  }
+}

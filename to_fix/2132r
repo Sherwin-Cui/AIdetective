@@ -1,0 +1,227 @@
+我来帮你排查推理系统的问题。让我们通过以下步骤来调试：
+
+## 1. 添加调试日志
+
+首先，在 `InferenceUI.js` 的 `performInference` 方法中添加详细的调试日志：
+
+```javascript
+performInference() {
+    console.log('[InferenceUI] 开始推理...');
+    
+    const selectedSize = this.selectedClues.size;
+    console.log('[InferenceUI] 选择的线索数量:', selectedSize);
+    console.log('[InferenceUI] 选择的线索:', Array.from(this.selectedClues));
+    
+    if (selectedSize < 2 || selectedSize > 3) {
+        UIManager.showToast('请选择 2 或 3 个线索进行推理', 2000, 'warning');
+        return;
+    }
+
+    const selectedArray = Array.from(this.selectedClues);
+    console.log('[InferenceUI] 已获得的线索:', GameState.acquiredClues.map(c => c.id));
+
+    // 查找匹配的推理规则
+    let matchedRule = null;
+    let matchedClueId = null;
+
+    for (const [clueId, rule] of Object.entries(InferenceRules)) {
+        console.log(`[InferenceUI] 检查规则: ${clueId}`);
+        
+        // 检查是否已经获得该推理线索
+        if (GameState.acquiredClues.some(c => c.id === clueId)) {
+            console.log(`[InferenceUI] 线索 ${clueId} 已经获得，跳过`);
+            continue;
+        }
+
+        // 改进的匹配逻辑：支持多种组合
+        const selectedSet = new Set(selectedArray);
+
+        // 检查是否有任何一个有效组合
+        if (rule.combinations) {
+            console.log(`[InferenceUI] 规则 ${clueId} 的组合:`, rule.combinations);
+            
+            for (const combo of rule.combinations) {
+                console.log(`[InferenceUI] 检查组合:`, combo);
+                console.log(`[InferenceUI] 组合长度: ${combo.length}, 选择长度: ${selectedSet.size}`);
+                console.log(`[InferenceUI] 组合匹配检查:`, combo.every(c => {
+                    const has = selectedSet.has(c);
+                    console.log(`  - ${c}: ${has}`);
+                    return has;
+                }));
+                
+                if (combo.length === selectedSet.size && combo.every(c => selectedSet.has(c))) {
+                    console.log(`[InferenceUI] 找到匹配的组合!`);
+                    matchedRule = rule;
+                    matchedClueId = clueId;
+                    break;
+                }
+            }
+        } else if (rule.prerequisites) {
+            console.log(`[InferenceUI] 规则 ${clueId} 使用旧的 prerequisites:`, rule.prerequisites);
+        }
+
+        if (matchedRule) break;
+    }
+
+    console.log('[InferenceUI] 匹配结果:', { matchedClueId, matchedRule });
+
+    if (matchedRule && matchedClueId) {
+        this.showInferenceProcess(matchedRule, matchedClueId);
+    } else {
+        UIManager.showToast('这些线索之间似乎没有关联...', 3000, 'error');
+    }
+}
+```
+
+## 2. 创建控制台调试工具
+
+在浏览器控制台中创建一个调试工具：
+
+```javascript
+// 在控制台运行这个调试工具
+window.inferenceDebug = {
+    // 显示所有推理规则
+    showRules() {
+        console.log('=== 所有推理规则 ===');
+        Object.entries(InferenceRules).forEach(([clueId, rule]) => {
+            console.log(`\n${clueId}:`);
+            console.log('组合:', rule.combinations || rule.prerequisites);
+            console.log('描述:', rule.description);
+        });
+    },
+    
+    // 显示已获得的线索
+    showAcquiredClues() {
+        console.log('=== 已获得的线索 ===');
+        console.log('线索ID列表:', GameState.acquiredClues.map(c => c.id));
+        console.log('线索详情:');
+        GameState.acquiredClues.forEach(clue => {
+            console.log(`- ${clue.id}: ${clue.name} [${clue.type}]`);
+        });
+    },
+    
+    // 测试特定的组合
+    testCombination(clueIds) {
+        console.log('=== 测试组合 ===');
+        console.log('测试线索:', clueIds);
+        
+        // 模拟选择
+        InferenceUI.selectedClues = new Set(clueIds);
+        InferenceUI.performInference();
+    },
+    
+    // 检查特定推理线索的状态
+    checkInferenceClue(clueId) {
+        console.log(`=== 检查推理线索: ${clueId} ===`);
+        
+        const rule = InferenceRules[clueId];
+        if (!rule) {
+            console.log('规则不存在');
+            return;
+        }
+        
+        console.log('规则配置:', rule);
+        console.log('是否已获得:', GameState.acquiredClues.some(c => c.id === clueId));
+        
+        if (rule.combinations) {
+            rule.combinations.forEach((combo, index) => {
+                console.log(`\n组合 ${index + 1}:`, combo);
+                combo.forEach(reqClueId => {
+                    const hasClue = GameState.acquiredClues.some(c => c.id === reqClueId);
+                    console.log(`  - ${reqClueId}: ${hasClue ? '✓ 已获得' : '✗ 未获得'}`);
+                });
+            });
+        }
+    },
+    
+    // 强制添加测试线索
+    addTestClues() {
+        const testClues = [
+            'clue_poison_bottle',
+            'clue_chen_garden',
+            'clue_maid_strange_smell',
+            'clue_cellar_key',
+            'clue_chen_cellar'
+        ];
+        
+        testClues.forEach(clueId => {
+            if (!GameState.acquiredClues.some(c => c.id === clueId)) {
+                const clueData = ClueData[clueId];
+                if (clueData) {
+                    GameState.acquiredClues.push({
+                        id: clueId,
+                        ...clueData
+                    });
+                }
+            }
+        });
+        
+        console.log('已添加测试线索');
+        this.showAcquiredClues();
+    }
+};
+
+console.log('推理调试工具已加载！');
+console.log('使用方法:');
+console.log('- inferenceDebug.showRules() - 显示所有推理规则');
+console.log('- inferenceDebug.showAcquiredClues() - 显示已获得的线索');
+console.log('- inferenceDebug.testCombination(["clue_id1", "clue_id2"]) - 测试特定组合');
+console.log('- inferenceDebug.checkInferenceClue("clue_id") - 检查特定推理线索');
+console.log('- inferenceDebug.addTestClues() - 添加测试线索');
+```
+
+## 3. 常见问题检查清单
+
+### 问题1: InferenceRules 未正确导入
+检查 `InferenceUI.js` 的导入语句：
+```javascript
+import { InferenceRules, InferenceSystemConfig } from '../config/gameData.js';
+```
+
+### 问题2: 线索ID不匹配
+在控制台运行：
+```javascript
+// 检查线索ID是否一致
+inferenceDebug.showAcquiredClues();
+inferenceDebug.showRules();
+```
+
+### 问题3: GameState.acquiredClues 数据结构问题
+检查线索数据结构：
+```javascript
+console.log('线索数据结构:', GameState.acquiredClues);
+```
+
+## 4. 修复建议
+
+如果发现 `InferenceRules` 未定义，可能需要在 `gameData.js` 末尾添加：
+
+```javascript
+// 导出到全局（用于调试）
+window.InferenceRules = InferenceRules;
+```
+
+或者确保 `InferenceUI.js` 能正确访问 `InferenceRules`：
+
+```javascript
+// 在 InferenceUI.js 的 init 方法中添加
+init() {
+    console.log('[InferenceUI] 初始化推理系统UI');
+    console.log('[InferenceUI] InferenceRules:', InferenceRules);
+    console.log('[InferenceUI] InferenceSystemConfig:', InferenceSystemConfig);
+    
+    this.createInferenceModal();
+    this.bindEvents();
+    this.injectStyles();
+}
+```
+
+## 5. 测试步骤
+
+1. 打开游戏，按 F12 打开控制台
+2. 运行调试工具代码
+3. 执行 `inferenceDebug.addTestClues()` 添加测试线索
+4. 打开推理界面，选择线索
+5. 查看控制台输出，找出具体错误位置
+
+请按照这些步骤操作，然后告诉我控制台的输出结果，我可以帮你进一步定位问题。
