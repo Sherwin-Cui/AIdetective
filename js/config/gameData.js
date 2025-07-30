@@ -47,14 +47,14 @@ export const ClueData = {
     'clue_wine_glass': { 
         name: '死者的酒杯', 
         img: 'assets/clues/wine_glass.png', 
-        description: '杯沿有唇印，杯底有白色粉末残留（杀虫剂和酒精反应的结晶）。', 
+        description: '死者使用过的酒杯，杯底有白色粉末残留，肉眼看不出是什么物质。或许可以找医生确认。', 
         type: 'evidence', 
         importance: 'important' 
     },
     'clue_will_draft': { 
         name: '遗嘱草稿', 
         img: 'assets/clues/testament.png', 
-        description: '在灰烬中发现了一份被烧了一半的遗嘱草稿！', 
+        description: '在灰烬中发现了一份被烧了一半的遗嘱草稿！看不清内容，但是似乎有人要销毁它。', 
         type: 'evidence' 
     },
     'clue_love_letter': { 
@@ -78,7 +78,7 @@ export const ClueData = {
     'clue_magnifying_glass': { 
         name: '放大镜', 
         img: 'assets/clues/magnifying_glass.png', 
-        description: '在书房的地球仪旁发现了一个放大镜！', 
+        description: '在书房的地球仪旁发现了一个放大镜！似乎被用来研究什么东西？', 
         type: 'evidence' 
     },
     'clue_cellar_key': { 
