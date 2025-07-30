@@ -280,9 +280,11 @@ export const EvidenceImportance = {
 // 计算证据得分
 export function calculateEvidenceScore(selectedEvidence, requiredEvidence) {
     let score = 0;
+    let correctEvidenceCount = 0;
     
     selectedEvidence.forEach(evidenceId => {
         if (requiredEvidence.includes(evidenceId)) {
+            correctEvidenceCount++;
             // 根据证据重要性给分
             if (EvidenceImportance.critical.includes(evidenceId)) {
                 score += AccusationConfig.evidenceScoring.criticalEvidence;
@@ -296,7 +298,21 @@ export function calculateEvidenceScore(selectedEvidence, requiredEvidence) {
         }
     });
     
-    // 计算可能的最高分
+    // 新的判定逻辑：如果没有要求证据，直接返回1
+    if (requiredEvidence.length === 0) {
+        return 1;
+    }
+    
+    // 放宽判定条件：三个证据中提供两个就判定为通过
+    // 计算需要的最少证据数量（至少2个，但不超过总数）
+    const minRequiredCount = Math.min(2, requiredEvidence.length);
+    
+    // 如果正确证据数量达到最少要求，且没有错误证据导致负分，则判定为通过
+    if (correctEvidenceCount >= minRequiredCount && score > 0) {
+        return 1; // 直接返回1表示通过
+    }
+    
+    // 否则按原来的得分率计算
     const maxScore = requiredEvidence.reduce((sum, evidenceId) => {
         if (EvidenceImportance.critical.includes(evidenceId)) {
             return sum + AccusationConfig.evidenceScoring.criticalEvidence;

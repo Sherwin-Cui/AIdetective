@@ -47,6 +47,7 @@ export const AccusationSystem = {
     isWaitingForResponse: false,
     debugMode: true, // 开启调试模式
     accusationUI: null, // 新增：指证UI实例
+    endingShown: false, // 新增：标记是否已显示过结局
     
     init() {
         console.log('[AccusationSystem] 初始化指认系统');
@@ -119,7 +120,7 @@ export const AccusationSystem = {
                 <!-- 底部控制按钮 -->
                 <div class="bottom-controls">
                     <button class="main-action-btn end-confrontation" id="end-confrontation" onclick="AccusationSystem.endConfrontation()">结束对决</button>
-                    <button class="main-action-btn attach-evidence" id="attach-evidence-btn" onclick="AccusationSystem.showEvidenceAttachment()">附加证据</button>
+                    <button class="main-action-btn attach-evidence" id="attach-evidence-btn" onclick="AccusationSystem.showEvidenceSelection()">附加证据</button>
                     <button class="main-action-btn" id="accusation-send">发送</button>
                 </div>
             </div>
@@ -192,6 +193,12 @@ export const AccusationSystem = {
                 input.onkeypress = (e) => {
                     if (e.key === 'Enter') this.sendAccusation();
                 };
+            }
+            
+            // 绑定证据选择提交按钮事件
+            const submitEvidenceBtn = document.getElementById('submit-evidence');
+            if (submitEvidenceBtn) {
+                submitEvidenceBtn.onclick = () => this.submitEvidence();
             }
         }, 100);
     },
@@ -827,6 +834,7 @@ export const AccusationSystem = {
         };
         this.pressureLevel = 'low';
         this.isWaitingForResponse = false;
+        this.endingShown = false; // 重置结局显示标志
     },
     
     showSuspectSelection() {
@@ -915,6 +923,8 @@ export const AccusationSystem = {
         
         // 获取附加的证据
         const attachedEvidence = this.attachedEvidence.slice();
+        console.log('sendAccusation - 附加证据:', attachedEvidence);
+        console.log('sendAccusation - attachedEvidence长度:', attachedEvidence.length);
         
         this.isWaitingForResponse = true;
         input.value = '';
@@ -937,18 +947,27 @@ export const AccusationSystem = {
     
         // 将附加证据合并到当前阶段的evidenceChain
         const phaseName = AccusationConfig.accusationPhases[this.currentPhase].name;
+        console.log(`当前阶段: ${this.currentPhase}, 阶段名称: ${phaseName}`);
+        console.log('附加证据:', attachedEvidence);
+        
         if (!this.evidenceChain[phaseName]) {
             this.evidenceChain[phaseName] = [];
         }
         attachedEvidence.forEach(evidenceId => {
             if (!this.evidenceChain[phaseName].includes(evidenceId)) {
                 this.evidenceChain[phaseName].push(evidenceId);
+                console.log(`证据 ${evidenceId} 已添加到阶段 ${phaseName}`);
             }
         });
+        
+        console.log(`阶段 ${phaseName} 的证据链:`, this.evidenceChain[phaseName]);
         
         // 更新对话计数和压力等级
         this.phaseDialogueCount++;
         this.updatePressureLevel();
+        
+        // 重新计算阶段通过状态（在提交证据后）
+        this.calculatePhasesPassed();
         
         // 生成NPC响应
         try {
@@ -966,8 +985,7 @@ export const AccusationSystem = {
         }
         
         // 清空附加证据
-        this.attachedEvidence = [];
-        this.updateAttachedEvidenceUI();
+        this.clearAttachedEvidence();
         
         this.isWaitingForResponse = false;
         input.disabled = false;
@@ -1169,9 +1187,33 @@ export const AccusationSystem = {
     },
     "total_phases_passed": ${Object.values(this.phasesPassed).filter(v => v).length},
     "is_true_culprit": ${this.currentAccused === 'chen_yaqin'},
-    "predicted_ending": "${this.getPredictedEnding()}"
+    "give_ending": false,
+    "predicted_ending": "failure"
 }
 </ending_judgment>
+
+## 结局判定指导
+
+### 何时给出结局判定
+当满足以下条件之一时，设置 "give_ending": true：
+1. **凶手认罪**：如果你是真凶(chen_yaqin)且在强有力证据面前选择认罪
+2. **证据确凿**：即使不认罪，但证据链已经非常完整，无法继续否认
+3. **对话达到上限**：对话轮数过多，需要结束指认
+
+### 结局类型判定规则
+根据证据完成度设置 "predicted_ending"：
+- **"perfect"**：四个证据链全部完成(motive、method、opportunity、conspiracy都为true)
+- **"good"**：三个证据链完成(注意：每个证据链只需2/3证据即可判定完成)
+- **"normal"**：两个证据链完成
+- **"failure"**：证据链完成少于两个，或指认了错误的人
+
+### 认罪时机指导
+如果你是真凶(chen_yaqin)，在以下情况下可以考虑认罪：
+- 动机、手段、机会三个环节中任意两个环节的关键证据被充分提出
+- 与管家的关系被揭露
+- 夹竹桃毒素的证据被发现
+- 感到无法继续否认下去
+- 注意：现在证据要求已放宽，每个证据链只需提供2/3的证据即可判定为完成
 
 ## 角色设定
 你是${character.name}，${character.age}岁，${character.identity}。${character.personality}
@@ -1273,6 +1315,18 @@ ${evidenceAssessment}
             }
         }
         
+        // 解析结局判定
+        const endingJudgmentMatch = response.match(/<ending_judgment>([\s\S]*?)<\/ending_judgment>/);
+        if (endingJudgmentMatch) {
+            try {
+                result.endingJudgment = JSON.parse(endingJudgmentMatch[1]);
+                result.text = result.text.replace(/<ending_judgment>[\s\S]*?<\/ending_judgment>/, '').trim();
+                console.log('解析到结局判定:', result.endingJudgment);
+            } catch (e) {
+                console.error('解析ending_judgment失败:', e);
+            }
+        }
+        
         return result;
     },
     
@@ -1346,10 +1400,114 @@ ${evidenceAssessment}
                 }, 2000);
             }
         }
+        
+        // 处理结局判定
+        if (response.endingJudgment) {
+            const judgment = response.endingJudgment;
+            console.log('AI返回结局判定:', judgment);
+            
+            // 实际计算证据得分并更新阶段通过状态
+            this.calculatePhasesPassed();
+            
+            // 如果AI也提供了phases_passed，可以作为参考但以实际计算为准
+            if (judgment.phases_passed) {
+                console.log('AI建议的phases_passed:', judgment.phases_passed);
+                console.log('实际计算的phases_passed:', this.phasesPassed);
+            }
+            
+            // 检查AI是否判定给出结局
+            if (judgment.give_ending) {
+                console.log('AI判定触发结局:', judgment.predicted_ending);
+                // 标记已显示结局，防止重复触发
+                this.endingShown = true;
+                
+                setTimeout(() => {
+                    this.showEnding(judgment.predicted_ending, { 
+                        achievements: [],
+                        accusedCharacter: judgment.accused_character,
+                        isTrueCulprit: judgment.is_true_culprit,
+                        totalPhasesPassed: judgment.total_phases_passed
+                    });
+                }, 2000);
+            } else {
+                console.log('AI判定继续对话，未触发结局');
+            }
+        }
+    },
+    
+    // 计算各阶段是否通过
+    calculatePhasesPassed() {
+        const phases = ['motive', 'method', 'opportunity', 'conspiracy'];
+        
+        phases.forEach(phase => {
+            // 获取该阶段所需的证据
+            const requiredEvidence = AccusationConfig.accusationPhases[phase].requiredEvidence[this.currentAccused] || [];
+            
+            // 获取该阶段已提交的证据
+            const submittedEvidence = this.evidenceChain[phase] || [];
+            
+            // 计算证据得分
+            const score = calculateEvidenceScore(submittedEvidence, requiredEvidence);
+            
+            // 判定是否通过（得分为1表示通过）
+            const passed = score >= 1;
+            
+            console.log(`阶段 ${phase}:`);
+            console.log('- 所需证据:', requiredEvidence);
+            console.log('- 已提交证据:', submittedEvidence);
+            console.log('- 证据得分:', score);
+            console.log('- 是否通过:', passed);
+            
+            // 更新阶段状态
+            this.phasesPassed[phase] = passed;
+        });
+        
+        console.log('最终phasesPassed状态:', this.phasesPassed);
+    },
+    
+    // 判断是否应该触发结局
+    shouldTriggerEnding(judgment) {
+        // 如果已经显示过结局，不再触发
+        if (this.endingShown) {
+            return { trigger: false };
+        }
+        
+        const isTrueCulprit = this.currentAccused === 'chen_yaqin';
+        const dialogueCount = this.dialogueHistory.length;
+        
+        // 情况1：选中凶手
+        if (isTrueCulprit) {
+            // 只有当AI明确判定为认罪时才触发结局
+            if (judgment.predicted_ending === 'perfect' || 
+                judgment.predicted_ending === 'good' || 
+                judgment.predicted_ending === 'normal') {
+                // 根据线索完善度确定结局类型
+                const passedPhases = Object.values(this.phasesPassed).filter(v => v).length;
+                let endingType = 'normal';
+                if (passedPhases >= 3) {
+                    endingType = 'perfect';
+                } else if (passedPhases >= 2) {
+                    endingType = 'good';
+                }
+                return { trigger: true, endingType };
+            }
+        } else {
+            // 情况2：选中非凶手，对话轮数达到10轮时触发失败结局
+            if (dialogueCount >= 10) {
+                return { trigger: true, endingType: 'failure' };
+            }
+        }
+        
+        // 其他情况不触发结局
+        return { trigger: false };
     },
     
     async showEvidenceRequest(dialogueControl) {
-        const container = document.getElementById('confrontation-dialogue');
+        const container = document.querySelector('.dialogue-display-area');
+        if (!container) {
+            console.error('[AccusationSystem] 找不到对话显示区域');
+            return;
+        }
         const requestDiv = document.createElement('div');
         requestDiv.className = 'evidence-request-prompt';
         requestDiv.innerHTML = `
@@ -1415,13 +1573,40 @@ ${evidenceAssessment}
         grid.innerHTML = '';
         this.selectedEvidence = [];
         
-        // 获取玩家已收集的线索
-        const collectedClues = AIClueManager.getTriggeredClues();
+        // 获取玩家已收集的线索（合并两个数据源）
+        const allCollectedClues = new Set();
+        
+        // 从AIClueManager获取已触发的线索
+        const triggeredClues = AIClueManager.getTriggeredClues();
+        triggeredClues.forEach(clueId => allCollectedClues.add(clueId));
+        
+        // 从GameState获取已获得的线索（包括推理线索）
+        if (GameState && GameState.acquiredClues) {
+            GameState.acquiredClues.forEach(clue => {
+                if (clue && clue.id) {
+                    allCollectedClues.add(clue.id);
+                }
+            });
+        }
+        
+        console.log('证据选择窗口 - 调试信息:');
+        console.log('- AIClueManager.getTriggeredClues():', triggeredClues);
+        console.log('- GameState.acquiredClues:', GameState?.acquiredClues);
+        console.log('- 合并后的所有线索:', Array.from(allCollectedClues));
+        
+        // 检查推理线索
+        if (GameState?.acquiredClues) {
+            const inferenceClues = GameState.acquiredClues.filter(clue => clue.type === 'inference');
+            console.log('- 推理线索:', inferenceClues);
+        }
         
         // 显示所有已收集的线索
-        collectedClues.forEach(clueId => {
+        allCollectedClues.forEach(clueId => {
             const clueData = AIClueManager.getClueById(clueId);
-            if (!clueData) return;
+            if (!clueData) {
+                console.warn(`未找到线索数据: ${clueId}`);
+                return;
+            }
             
             const item = document.createElement('div');
             item.className = 'evidence-item';
@@ -1439,6 +1624,9 @@ ${evidenceAssessment}
         const submitBtn = document.getElementById('submit-evidence');
         submitBtn.onclick = () => this.submitEvidence();
         submitBtn.disabled = true;
+        
+        // 初始化计数器显示
+        this.updateEvidenceCounter();
         
         // 显示模态框
         modal.style.display = 'flex';
@@ -1464,41 +1652,109 @@ ${evidenceAssessment}
                 }
             }
         }
+        
+        // 更新计数器显示
+        this.updateEvidenceCounter();
+        
+        // 更新提交按钮状态
+        this.updateSubmitButtonState();
     },
     
-    async submitEvidence() {
-        this.hideModal('evidence-selection-modal');
-        
-        const phase = AccusationConfig.accusationPhases[this.currentPhase];
-        const phaseName = phase.name;
-        const requiredEvidence = phase.requiredEvidence[this.currentAccused] || [];
-        
-        // 保存提交的证据
-        this.evidenceChain[phaseName] = this.selectedEvidence;
-        console.log('保存证据到阶段:', phaseName, '证据:', this.selectedEvidence);
-        
-        // 检查证据是否正确（使用评分系统）
-        const score = calculateEvidenceScore(this.selectedEvidence, requiredEvidence);
-        const isCorrect = score >= 0.6; // 60%以上算通过
-        
-        // 记录阶段结果
-        this.phasesPassed[phaseName] = isCorrect;
-        
-        // 生成提交证据的对话
-        const evidenceNames = this.getEvidenceNames(this.selectedEvidence);
-        await this.addDialogue('detective', `我有证据！看看这些：${evidenceNames.join('、')}`);
-        
-        // NPC需要取证做出反应
-        const evidenceResponse = await this.generateEvidenceResponse(this.selectedEvidence, isCorrect);
-        await this.processNPCResponse(evidenceResponse);
-        
-        // 更新压力等级
-        if (isCorrect) {
-            this.increasePressure();
+    updateEvidenceCounter() {
+        const counterElement = document.getElementById('selected-evidence-count');
+        if (counterElement) {
+            counterElement.textContent = `已选择: ${this.selectedEvidence.length}/3`;
         }
     },
     
-    async generateEvidenceResponse(evidence, isCorrect) {
+    updateSubmitButtonState() {
+        const submitBtn = document.getElementById('submit-evidence');
+        if (submitBtn) {
+            submitBtn.disabled = this.selectedEvidence.length === 0;
+        }
+    },
+    
+    async submitEvidence() {
+        console.log('submitEvidence被调用，选中的证据:', this.selectedEvidence);
+        this.hideModal('evidence-selection-modal');
+        
+        // 将选中的证据吸附到输入框
+        const evidenceNames = this.getEvidenceNames(this.selectedEvidence);
+        const inputField = document.querySelector('.dialogue-input');
+        
+        if (inputField) {
+            // 创建证据标签显示在输入框上方
+            this.showAttachedEvidenceInInput(this.selectedEvidence);
+            
+            // 清空输入框，让用户可以继续输入
+            inputField.value = '';
+            inputField.placeholder = `已选择证据：${evidenceNames.join('、')}，请输入你的话...`;
+            inputField.focus();
+        }
+        
+        // 将证据保存到attachedEvidence中，等待用户发送
+        this.attachedEvidence = [...this.selectedEvidence];
+        console.log('submitEvidence完成，attachedEvidence:', this.attachedEvidence);
+        
+        console.log('证据已吸附到输入框:', this.attachedEvidence);
+    },
+    
+    // 新增：在输入框上方显示已选择的证据
+    showAttachedEvidenceInInput(evidenceIds) {
+        const dialogueArea = document.querySelector('.dialogue-display-area');
+        if (!dialogueArea) return;
+        
+        // 移除之前的证据显示
+        const existingEvidenceDisplay = document.getElementById('attached-evidence-display');
+        if (existingEvidenceDisplay) {
+            existingEvidenceDisplay.remove();
+        }
+        
+        // 创建证据显示区域
+        const evidenceDisplay = document.createElement('div');
+        evidenceDisplay.id = 'attached-evidence-display';
+        evidenceDisplay.className = 'attached-evidence-display';
+        
+        const evidenceNames = this.getEvidenceNames(evidenceIds);
+        evidenceDisplay.innerHTML = `
+            <div class="evidence-header">📎 已选择证据：</div>
+            <div class="evidence-list">
+                ${evidenceNames.map(name => `<span class="evidence-tag">${name}</span>`).join('')}
+            </div>
+            <button class="clear-evidence-btn" onclick="AccusationSystem.clearAttachedEvidence()">清除证据</button>
+        `;
+        
+        // 添加样式
+        evidenceDisplay.style.cssText = `
+            background: #f0f8ff;
+            border: 2px dashed #4a90e2;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        `;
+        
+        // 插入到对话区域的底部
+        dialogueArea.appendChild(evidenceDisplay);
+    },
+    
+    // 新增：清除已吸附的证据
+    clearAttachedEvidence() {
+        this.attachedEvidence = [];
+        const evidenceDisplay = document.getElementById('attached-evidence-display');
+        if (evidenceDisplay) {
+            evidenceDisplay.remove();
+        }
+        
+        const inputField = document.querySelector('.dialogue-input');
+        if (inputField) {
+            inputField.placeholder = '输入你的话...';
+        }
+        
+        console.log('已清除吸附的证据');
+     },
+     
+     async generateEvidenceResponse(evidence, isCorrect) {
         const character = CharacterPersonalities[this.currentAccused];
         const evidenceNames = this.getEvidenceNames(evidence);
         
@@ -1669,11 +1925,16 @@ ${evidenceAssessment}
         
         // 显示可用证据
         const grid = document.getElementById('attachment-evidence-grid');
-        const collectedClues = AIClueManager.getTriggeredClues();
         
-        collectedClues.forEach(clueId => {
-            const clueData = AIClueManager.getClueById(clueId);
-            if (!clueData) return;
+        // 使用GameState中的所有已获得线索，而不仅仅是触发的线索
+        const collectedClues = GameState.acquiredClues || [];
+        
+        collectedClues.forEach(clue => {
+            // 跳过推理类线索
+            if (clue.type === 'inference') return;
+            
+            const clueId = clue.id;
+            const clueData = clue;
             
             const item = document.createElement('div');
             item.className = 'evidence-item';
@@ -1787,13 +2048,19 @@ ${evidenceAssessment}
             this.accusationUI.endAccusationMode();
         }
         
-        // 如果没有进行足够的对话，给出提示
-        if (this.dialogueHistory.length < 10) {
-            if (confirm('对话还不够充分，确定要结束对决吗？')) {
-                this.processFinalVerdict();
-            }
-        } else {
-            this.processFinalVerdict();
+        // 如果已经显示过结局，不再触发
+        if (this.endingShown) {
+            return;
+        }
+        
+        // 用户主动结束指认，触发失败结局
+        if (confirm('确定要结束指认吗？这将导致指认失败。')) {
+            this.showEnding('failure', { 
+                achievements: [],
+                accusedCharacter: this.currentAccused,
+                isTrueCulprit: this.currentAccused === 'chen_yaqin',
+                totalPhasesPassed: Object.values(this.phasesPassed).filter(v => v).length
+            });
         }
     },
     
@@ -1834,8 +2101,12 @@ ${evidenceAssessment}
             return;
         }
 
-        // Dispatch gameEnded event for the music system
-        // document.dispatchEvent(new CustomEvent('gameEnded', { detail: { isSuccess: endingData.success } }));
+        // 标记已显示结局
+        this.endingShown = true;
+        
+        // 播放confession.mp3音乐
+        MusicSystem.play('confession', 'assets/BGM/confession/confession.mp3');
+        console.log('结局弹窗出现，开始播放confession.mp3');
 
         // 设置标题和样式
         titleEl.textContent = endingData.title;
