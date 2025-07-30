@@ -4,9 +4,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Large audio files
-assets/BGM/
-*.mp3
+# Large audio files (now handled by Git LFS)
+# assets/BGM/
+# *.mp3
 *.wav
 *.ogg
 *.m4a
