@@ -1,7 +1,7 @@
 /* 引入像素字体 */
 @font-face {
     font-family: 'Zpix';
-    src: url('../assets/fonts/Zpix.ttf') format('truetype');
+    src: url('../assets/fonts/zpix.ttf') format('truetype');
 }
 
 @font-face {
